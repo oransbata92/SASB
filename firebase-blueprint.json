@@ -1,0 +1,47 @@
+{
+  "entities": {
+    "Signal": {
+      "title": "Trading Signal",
+      "description": "A record of a trading decision made by the system.",
+      "type": "object",
+      "properties": {
+        "symbol": { "type": "string" },
+        "assetClass": { "type": "string", "enum": ["crypto", "forex", "stocks"] },
+        "timeframe": { "type": "string" },
+        "decision": { "type": "string", "enum": ["BUY", "SELL", "WAIT"] },
+        "confidence": { "type": "number" },
+        "entry": { "type": "number" },
+        "stopLoss": { "type": "number" },
+        "takeProfit": { "type": "number" },
+        "riskReward": { "type": "string" },
+        "positionSize": { "type": "number" },
+        "result": { "type": "string", "enum": ["WIN", "LOSS", "PENDING"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["symbol", "assetClass", "timeframe", "decision", "confidence", "createdAt"]
+    },
+    "User": {
+      "title": "User Profile",
+      "description": "User settings and history storage.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "balance": { "type": "number" },
+        "riskPercent": { "type": "number" },
+        "watchlist": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "balance", "riskPercent"]
+    }
+  },
+  "firestore": {
+    "signals/{signalId}": {
+      "schema": "Signal",
+      "description": "Global history of generated signals."
+    },
+    "users/{userId}": {
+      "schema": "User",
+      "description": "Individual user profiles and settings."
+    }
+  }
+}

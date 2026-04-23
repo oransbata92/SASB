@@ -1,0 +1,73 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- SHARED HELPERS ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- SIGNALS COLLECTION ---
+    match /signals/{signalId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidSignal(incoming());
+      // Signals are immutable after creation
+      allow update, delete: if false;
+    }
+
+    function isValidSignal(data) {
+      return data.keys().hasAll(['symbol', 'assetClass', 'timeframe', 'decision', 'confidence', 'createdAt'])
+        && data.symbol is string && data.symbol.size() <= 20
+        && data.assetClass in ['crypto', 'forex', 'stocks']
+        && data.timeframe is string && data.timeframe.size() <= 10
+        && data.decision in ['BUY', 'SELL', 'WAIT']
+        && data.confidence is number && data.confidence >= 0 && data.confidence <= 100
+        && (data.get('entry', null) == null || data.entry is number)
+        && (data.get('stopLoss', null) == null || data.stopLoss is number)
+        && (data.get('takeProfit', null) == null || data.takeProfit is number)
+        && (data.get('riskReward', null) == null || data.riskReward is string)
+        && (data.get('positionSize', null) == null || data.positionSize is number)
+        && (data.get('result', 'PENDING') in ['WIN', 'LOSS', 'PENDING'])
+        && data.createdAt == request.time;
+    }
+
+    // --- USERS COLLECTION ---
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidUser(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['balance', 'riskPercent', 'watchlist', 'updatedAt'])
+        && incoming().email == existing().email; // Email is immutable
+      allow delete: if false; 
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'balance', 'riskPercent'])
+        && data.email is string && data.email.size() <= 100
+        && data.balance is number && data.balance >= 0
+        && data.riskPercent is number && data.riskPercent >= 0 && data.riskPercent <= 100
+        && (data.get('watchlist', []) is list)
+        && data.get('createdAt', request.time) == (resource == null ? request.time : existing().createdAt);
+    }
+  }
+}
